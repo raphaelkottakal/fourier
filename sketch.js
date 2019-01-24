@@ -1,30 +1,66 @@
-// let y = [];
-// let fourierY;
+const x = [];
+const y = [];
+let fourierX;
+let fourierY;
 
 let time = 0;
 let wave = [];
+let path = [];
 const circleOffsetX = 150
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  // y = [100, 100, 100, -100, -100, -100, 100, 100, 100, -100, -100, -100100, 100, 100, -100, -100, -100];
-  // fourierY = dft(y);
+  // y = [100, 100, 100, -100, -100, -100, 100, 100, 100, -100, -100, -100,100, 100, 100, -100, -100, -100];
+  for (let i = 0; i < drawing.length; i += 10) {
+    x.push(drawing[i].x);
+    y.push(drawing[i].y);
+  }
+  fourierX = dft(x);
+  fourierY = dft(y);
+
+  fourierX.sort((a,b) => b.amp - a.amp);
+  fourierY.sort((a,b) => b.amp - a.amp);
 }
 
-function draw() {
-  background(0);
-  translate(200, windowHeight / 2);
+function dft(x) {
+  const X = [];
+  const N = x.length;
 
-  x = 0;
-  y = 0;
+  for (let k = 0; k < N; k++) {
+    let re = 0;
+    let im = 0;
+    for (let n = 0; n < N; n++) {
+      let phi = (TWO_PI * k * n) / N;
+      re += x[n] * cos(phi);
+      im -= x[n] * sin(phi);
+    }
+    re = re / N;
+    im = im / N;
 
-  for(let i = 0; i < 4; i++) {
+    const freq = k;
+    const amp = sqrt(re * re + im * im);
+    const phase = atan2(im, re);
+
+    X[k] = {
+      re,
+      im,
+      freq,
+      amp,
+      phase
+    }
+  }
+  return X;
+}
+
+function epiCycle(x, y, rotation, fourier) {
+  for(let i = 0; i < fourier.length; i++) {
     let prevX = x;
     let prevY = y;
-    const n = i * 2 + 1;
-    const radius = 100 * (4 / (n * PI));
-    x += radius * cos(n * time);
-    y += radius * sin(n *time);
+    const freq = fourier[i].freq;
+    const radius = fourier[i].amp;
+    const phase = fourier[i].phase;
+    x += radius * cos(freq * time + phase + rotation);
+    y += radius * sin(freq * time + phase + rotation);
     
     stroke(255, 100);
     noFill();
@@ -37,25 +73,36 @@ function draw() {
     line(prevX, prevY, x, y);
     
   }
-  wave.unshift(y);
+  return createVector(x, y);
+}
+
+function draw() {
+  background(0);
+
+  const vx =  epiCycle(400, 50, 0, fourierX);
+  const vy = epiCycle(50, 400, HALF_PI, fourierY);
+  const v = createVector(vx.x, vy.y);
+  path.unshift(v);
   stroke(255, 100);
-  line(x, y, 150, wave[0]);
+  line(vx.x, vx.y, v.x, v.y);
+  line(vy.x, vy.y, v.x, v.y);
   
   noFill();
   stroke('hsl(120, 50%, 50%)');
   beginShape();
-  for (let i = wave.length - 1; i >= 0; i--) {
-    vertex(150 + i, wave[i]);
+  for (let i = path.length - 1; i >= 0; i--) {
+    vertex(path[i].x, path[i].y);
   }
   endShape();
 
-  
-  
-  if (wave.length > 500) {
-    wave.pop();
-  }
+  const dt = TWO_PI / fourierY.length;
 
-  time += 0.02;
+  time += dt;
+  if (time > TWO_PI) {
+    time = 0;
+    console.log(path.length);
+    path = [];
+  }
 }
 
 function windowResized() {
